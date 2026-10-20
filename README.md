@@ -17,6 +17,7 @@ This is the HW2 (Task 2) foundation that will later grow into the StyleBook midt
 - **Wardrobe screen** — an editorial masthead header plus a `LazyColumn` list of clothing pieces, each showing a number, illustration, name, category, color swatch, and a favorite star.
 - **Item details screen** — a large illustration, a spec sheet (category / colour / status), a favorite toggle, and a **Style Note** card that suggests an outfit pairing from another piece in the wardrobe.
 - **Add Piece screen** — a form (`TextField`s, category chips, `Button`) with required-field validation and success/error feedback. New pieces appear in the wardrobe immediately.
+- **Search & filter** — a search `OutlinedTextField` (name / category / colour) and a *Show favorites only* `Checkbox` filter the wardrobe list live.
 - **Two bottom tabs** to move between the wardrobe and the add-piece form.
 - **Favorites** — tapping the star on any card or the button on the details screen instantly updates the UI.
 - **Bundled vector artwork** — all illustrations are local drawables, so the app needs **no network access**.
@@ -40,9 +41,9 @@ app/src/main/java/com/example/stylebook/
 │   └── SampleClothingData.kt        # Initial sample wardrobe
 └── ui/
     ├── StyleBookApp.kt              # App scaffold + simple tab/screen switching
-    ├── Modifiers.kt                 # Small reusable Modifier helper
+    ├── ColorSwatch.kt               # Shared colour-name → swatch mapping
     ├── screens/
-    │   ├── WardrobeScreen.kt        # Home list + reusable card/list/header/favorite composables
+    │   ├── WardrobeScreen.kt        # Home list + reusable header/search bar/list/card/favorite composables
     │   ├── AddItemScreen.kt         # Add-piece form with validation
     │   └── ItemDetailScreen.kt      # Details + outfit suggestion
     ├── viewmodel/WardrobeViewModel.kt   # State + business logic (StateFlow)
@@ -55,16 +56,16 @@ app/src/main/java/com/example/stylebook/
 |---|---|
 | Kotlin + Jetpack Compose | Whole project |
 | Material 3 + consistent styling | `ui/theme/`, all screens |
-| ≥ 3 reusable composables | `WardrobeHeader`, `ClothingItemList`, `ClothingItemCard`, `FavoriteButton`, plus form helpers |
+| ≥ 3 reusable composables | `WardrobeHeader`, `SearchAndFilterBar`, `ClothingItemList`, `ClothingItemCard`, `FavoriteButton`, plus form helpers |
 | `Row`, `Column`, `Box` | All screens |
 | `LazyColumn`, `Card`, `Text`, `Image` | `WardrobeScreen` (LazyColumn/Image/Text), `ItemDetailScreen` (OutlinedCard/Image/Text) |
-| ≥ 2 meaningful interactions | Add a piece, toggle favorite, open details, pick a category |
-| Input components | `OutlinedTextField`, `Button`, selectable category chips |
-| UI updates on action | Adding/favoriting updates the list instantly |
+| ≥ 2 meaningful interactions | Add a piece, search, filter favorites, toggle favorite, open details, pick a category |
+| Input components | `OutlinedTextField`, `Button`, `Checkbox`, selectable category chips |
+| UI updates on action | Adding, favoriting, searching and filtering update the list instantly |
 | `remember` + `rememberSaveable` | `rememberSaveable` for form fields / current tab / selected item; `remember` for the category list |
-| ≥ 1 `ViewModel` | `WardrobeViewModel` exposes `StateFlow<WardrobeUiState>` |
+| ≥ 1 `ViewModel` | `WardrobeViewModel` exposes `StateFlow<WardrobeUiState>` (items, search query, favorites filter, filtering & pairing logic) |
 | UI / state separation | Composables are stateless and driven by the ViewModel via callbacks |
-| Survives Activity recreation | ViewModel keeps the wardrobe across rotation; `rememberSaveable` restores UI state |
+| Survives Activity recreation | ViewModel keeps the wardrobe and filters across rotation; `rememberSaveable` restores UI state |
 
 ## Running the app
 
@@ -88,7 +89,7 @@ The built APK is at `app/build/outputs/apk/debug/app-debug.apk`.
 - **`ViewModel`** holds screen/app state and business logic that survives configuration changes, and keeps UI logic out of composables. Used here for the in-memory wardrobe collection and the add/favorite actions, exposed as a `StateFlow`.
 
 ### What happens during rotation
-The `WardrobeViewModel` instance is retained, so the wardrobe collection and favorites stay intact. `rememberSaveable` restores the open screen, selected item, and any text already typed in the form.
+The `WardrobeViewModel` instance is retained, so the wardrobe collection, favorites, search query and favorites filter stay intact. `rememberSaveable` restores the open screen, selected item, and any text already typed in the form.
 
 ### What happens if the process is terminated
 A `ViewModel` is **not** persistent storage. If Android kills the app process, the in-memory wardrobe resets to the sample data. `rememberSaveable` can restore supported UI state if the OS saved it, but it is not a database — durable persistence (e.g. Room/DataStore) is intentionally out of scope for this assignment.
