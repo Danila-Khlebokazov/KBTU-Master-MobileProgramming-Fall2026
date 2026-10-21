@@ -1,141 +1,250 @@
 package com.example.stylebook.ui
 
-import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.width
-import androidx.compose.material3.HorizontalDivider
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material3.FloatingActionButton
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.NavigationBar
+import androidx.compose.material3.NavigationBarItem
+import androidx.compose.material3.NavigationBarItemDefaults
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Snackbar
+import androidx.compose.material3.SnackbarDuration
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.unit.dp
+import androidx.compose.ui.graphics.RectangleShape
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.navigation.NavGraph.Companion.findStartDestination
+import androidx.navigation.NavHostController
+import androidx.navigation.NavType
+import androidx.navigation.compose.NavHost
+import androidx.navigation.compose.composable
+import androidx.navigation.compose.currentBackStackEntryAsState
+import androidx.navigation.compose.rememberNavController
+import androidx.navigation.navArgument
+import com.example.stylebook.ui.navigation.Routes
+import com.example.stylebook.ui.navigation.TopLevelDestination
 import com.example.stylebook.ui.screens.AddItemScreen
+import com.example.stylebook.ui.screens.FavoritesScreen
+import com.example.stylebook.ui.screens.HomeScreen
 import com.example.stylebook.ui.screens.ItemDetailScreen
+import com.example.stylebook.ui.screens.OutfitGeneratorScreen
 import com.example.stylebook.ui.screens.WardrobeScreen
+import com.example.stylebook.ui.viewmodel.OutfitViewModel
 import com.example.stylebook.ui.viewmodel.WardrobeViewModel
+import kotlinx.coroutines.flow.merge
 
-private const val WARDROBE = "wardrobe"
-private const val ADD_ITEM = "add"
-private const val ITEM_DETAILS = "details"
-
+/**
+ * App shell: owns the NavController, the Activity-scoped ViewModels and the Snackbar host.
+ * Screens receive plain state + callbacks (state hoisting) and never see a ViewModel directly.
+ */
 @Composable
-fun StyleBookApp(viewModel: WardrobeViewModel = viewModel()) {
-    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
-    var destination by rememberSaveable { mutableStateOf(WARDROBE) }
-    var selectedItemId by rememberSaveable { mutableIntStateOf(-1) }
+fun StyleBookApp(
+    wardrobeViewModel: WardrobeViewModel = viewModel(),
+    outfitViewModel: OutfitViewModel = viewModel()
+) {
+    val navController = rememberNavController()
+    val snackbarHostState = remember { SnackbarHostState() }
+
+    val wardrobeState by wardrobeViewModel.uiState.collectAsStateWithLifecycle()
+    val outfitState by outfitViewModel.uiState.collectAsStateWithLifecycle()
+
+    val backStackEntry by navController.currentBackStackEntryAsState()
+    val currentRoute = backStackEntry?.destination?.route
+    val currentTopLevel = TopLevelDestination.entries.firstOrNull { it.route == currentRoute }
+
+    // One-off messages (e.g. "Removed X — Undo") from both ViewModels are shown as Snackbars.
+    LaunchedEffect(wardrobeViewModel, outfitViewModel) {
+        merge(wardrobeViewModel.messages, outfitViewModel.messages).collect { message ->
+            val result = snackbarHostState.showSnackbar(
+                message = message.text,
+                actionLabel = message.actionLabel,
+                duration = if (message.actionLabel != null) SnackbarDuration.Long else SnackbarDuration.Short
+            )
+            if (result == SnackbarResult.ActionPerformed) message.onAction?.invoke()
+        }
+    }
 
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
-        bottomBar = {
-            if (destination != ITEM_DETAILS) {
-                EditorialTabBar(
-                    current = destination,
-                    onSelect = { destination = it }
+        snackbarHost = {
+            SnackbarHost(snackbarHostState) { data ->
+                Snackbar(
+                    snackbarData = data,
+                    shape = RectangleShape,
+                    containerColor = MaterialTheme.colorScheme.primary,
+                    contentColor = MaterialTheme.colorScheme.onPrimary,
+                    actionColor = MaterialTheme.colorScheme.secondary
                 )
+            }
+        },
+        bottomBar = {
+            if (currentTopLevel != null) {
+                StyleBookNavigationBar(
+                    current = currentTopLevel,
+                    onSelect = { navController.navigateToTopLevel(it.route) }
+                )
+            }
+        },
+        floatingActionButton = {
+            if (currentTopLevel == TopLevelDestination.WARDROBE) {
+                FloatingActionButton(
+                    onClick = { navController.navigate(Routes.ADD_ITEM) },
+                    shape = RoundedCornerShape(0),
+                    containerColor = MaterialTheme.colorScheme.primary,
+                    contentColor = MaterialTheme.colorScheme.onPrimary
+                ) {
+                    Icon(Icons.Filled.Add, contentDescription = "Add a piece")
+                }
             }
         }
     ) { innerPadding ->
-        Box(
+        NavHost(
+            navController = navController,
+            startDestination = Routes.HOME,
             modifier = Modifier
                 .fillMaxSize()
-                .background(MaterialTheme.colorScheme.background)
                 .padding(innerPadding)
         ) {
-            when (destination) {
-                ADD_ITEM -> AddItemScreen(onAddItem = viewModel::addItem)
-                ITEM_DETAILS -> {
-                    val item = uiState.items.firstOrNull { it.id == selectedItemId }
-                    if (item == null) {
-                        destination = WARDROBE
-                    } else {
-                        ItemDetailScreen(
-                            item = item,
-                            outfitPartner = uiState.items.firstOrNull {
-                                it.id != item.id && it.category != item.category
-                            },
-                            onBack = { destination = WARDROBE },
-                            onFavoriteClick = { viewModel.toggleFavorite(item.id) }
-                        )
-                    }
-                }
-                else -> WardrobeScreen(
-                    items = uiState.items,
-                    onItemClick = { item ->
-                        selectedItemId = item.id
-                        destination = ITEM_DETAILS
+            composable(Routes.HOME) {
+                HomeScreen(
+                    items = wardrobeState.allItems,
+                    favoriteCount = wardrobeState.favoriteItems.size,
+                    savedLookCount = outfitState.savedOutfits.size,
+                    todaysLook = outfitState.outfit,
+                    onOpenWardrobe = {
+                        wardrobeViewModel.clearFilters()
+                        navController.navigateToTopLevel(Routes.WARDROBE)
                     },
-                    onFavoriteClick = viewModel::toggleFavorite
+                    onOpenFavorites = { navController.navigateToTopLevel(Routes.FAVORITES) },
+                    onOpenGenerator = { navController.navigateToTopLevel(Routes.GENERATOR) },
+                    onShuffleLook = outfitViewModel::generate,
+                    onCategoryClick = { category ->
+                        wardrobeViewModel.showCategory(category)
+                        navController.navigateToTopLevel(Routes.WARDROBE)
+                    },
+                    onItemClick = { navController.navigate(Routes.itemDetail(it.id)) },
+                    onAddItem = { navController.navigate(Routes.ADD_ITEM) }
                 )
+            }
+            composable(Routes.WARDROBE) {
+                WardrobeScreen(
+                    state = wardrobeState,
+                    onQueryChange = wardrobeViewModel::onQueryChange,
+                    onCategorySelected = wardrobeViewModel::onCategorySelected,
+                    onFavoritesOnlyChange = wardrobeViewModel::onFavoritesOnlyChange,
+                    onClearFilters = wardrobeViewModel::clearFilters,
+                    onItemClick = { navController.navigate(Routes.itemDetail(it.id)) },
+                    onFavoriteClick = wardrobeViewModel::toggleFavorite,
+                    onAddItem = { navController.navigate(Routes.ADD_ITEM) }
+                )
+            }
+            composable(Routes.GENERATOR) {
+                OutfitGeneratorScreen(
+                    state = outfitState,
+                    onOccasionSelected = outfitViewModel::onOccasionSelected,
+                    onIncludeLayerChange = outfitViewModel::onIncludeLayerChange,
+                    onToggleLock = outfitViewModel::toggleLock,
+                    onShuffle = outfitViewModel::generate,
+                    onSave = outfitViewModel::saveCurrentOutfit,
+                    onPieceClick = { navController.navigate(Routes.itemDetail(it.id)) },
+                    onAddItem = { navController.navigate(Routes.ADD_ITEM) }
+                )
+            }
+            composable(Routes.FAVORITES) {
+                FavoritesScreen(
+                    favoriteItems = wardrobeState.favoriteItems,
+                    savedOutfits = outfitState.savedOutfits,
+                    onItemClick = { navController.navigate(Routes.itemDetail(it.id)) },
+                    onFavoriteClick = wardrobeViewModel::toggleFavorite,
+                    onRemoveOutfit = outfitViewModel::removeOutfit,
+                    onOpenGenerator = { navController.navigateToTopLevel(Routes.GENERATOR) },
+                    onOpenWardrobe = {
+                        wardrobeViewModel.clearFilters()
+                        navController.navigateToTopLevel(Routes.WARDROBE)
+                    }
+                )
+            }
+            composable(Routes.ADD_ITEM) {
+                AddItemScreen(
+                    onValidate = wardrobeViewModel::validate,
+                    onSave = wardrobeViewModel::addItem,
+                    onSaved = { navController.popBackStack() },
+                    onBack = { navController.popBackStack() }
+                )
+            }
+            composable(
+                route = Routes.ITEM_DETAIL,
+                arguments = listOf(navArgument(Routes.ITEM_ID_ARG) { type = NavType.IntType })
+            ) { entry ->
+                val itemId = entry.arguments?.getInt(Routes.ITEM_ID_ARG) ?: -1
+                val item = wardrobeState.itemById(itemId)
+                if (item == null) {
+                    // The id is invalid or the piece was deleted elsewhere: leave the screen,
+                    // but only if this entry is still on top (it may already be animating out).
+                    LaunchedEffect(itemId) {
+                        if (navController.currentBackStackEntry?.id == entry.id) navController.popBackStack()
+                    }
+                } else {
+                    ItemDetailScreen(
+                        item = item,
+                        savedLooksWithItem = outfitState.savedOutfits.count { it.contains(item.id) },
+                        onBack = { navController.popBackStack() },
+                        onFavoriteClick = { wardrobeViewModel.toggleFavorite(item.id) },
+                        onStyleItem = {
+                            outfitViewModel.styleAround(item)
+                            navController.navigateToTopLevel(Routes.GENERATOR)
+                        },
+                        onDelete = {
+                            navController.popBackStack()
+                            wardrobeViewModel.deleteItem(item.id)
+                        }
+                    )
+                }
             }
         }
     }
 }
 
-@Composable
-private fun EditorialTabBar(current: String, onSelect: (String) -> Unit) {
-    Column {
-        HorizontalDivider(thickness = 1.dp, color = MaterialTheme.colorScheme.outline)
-        Row(modifier = Modifier.fillMaxWidth()) {
-            EditorialTab(
-                label = "WARDROBE",
-                selected = current == WARDROBE,
-                onClick = { onSelect(WARDROBE) },
-                modifier = Modifier.weight(1f)
-            )
-            Box(
-                modifier = Modifier
-                    .width(1.dp)
-                    .height(56.dp)
-                    .background(MaterialTheme.colorScheme.outline)
-            )
-            EditorialTab(
-                label = "ADD PIECE",
-                selected = current == ADD_ITEM,
-                onClick = { onSelect(ADD_ITEM) },
-                modifier = Modifier.weight(1f)
-            )
-        }
+/** Standard bottom-bar navigation: one copy of each tab, state of other tabs saved and restored. */
+private fun NavHostController.navigateToTopLevel(route: String) {
+    navigate(route) {
+        popUpTo(graph.findStartDestination().id) { saveState = true }
+        launchSingleTop = true
+        restoreState = true
     }
 }
 
 @Composable
-private fun EditorialTab(
-    label: String,
-    selected: Boolean,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier
-) {
-    val bg = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.background
-    val fg = if (selected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant
-    Box(
-        modifier = modifier
-            .height(56.dp)
-            .background(bg)
-            .clickableNoRipple(onClick),
-        contentAlignment = Alignment.Center
-    ) {
-        Text(
-            text = label,
-            style = MaterialTheme.typography.labelLarge,
-            color = fg,
-            textAlign = TextAlign.Center,
-            modifier = Modifier.fillMaxWidth()
-        )
+private fun StyleBookNavigationBar(current: TopLevelDestination, onSelect: (TopLevelDestination) -> Unit) {
+    val itemColors = NavigationBarItemDefaults.colors(
+        selectedIconColor = MaterialTheme.colorScheme.onPrimary,
+        selectedTextColor = MaterialTheme.colorScheme.onBackground,
+        indicatorColor = MaterialTheme.colorScheme.primary,
+        unselectedIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
+        unselectedTextColor = MaterialTheme.colorScheme.onSurfaceVariant
+    )
+    NavigationBar(containerColor = MaterialTheme.colorScheme.background) {
+        TopLevelDestination.entries.forEach { destination ->
+            NavigationBarItem(
+                selected = current == destination,
+                onClick = { onSelect(destination) },
+                icon = { Icon(destination.icon, contentDescription = null) },
+                label = { Text(destination.label.uppercase(), style = MaterialTheme.typography.labelSmall) },
+                colors = itemColors
+            )
+        }
     }
 }

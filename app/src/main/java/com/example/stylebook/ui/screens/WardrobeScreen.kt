@@ -1,261 +1,210 @@
 package com.example.stylebook.ui.screens
 
-import androidx.compose.foundation.Image
-import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Clear
+import androidx.compose.material.icons.filled.Favorite
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.res.painterResource
-import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.graphics.RectangleShape
+import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
+import com.example.stylebook.data.model.Category
 import com.example.stylebook.data.model.ClothingItem
-import com.example.stylebook.ui.clickableNoRipple
+import com.example.stylebook.ui.components.ClothingItemRow
+import com.example.stylebook.ui.components.EditorialChip
+import com.example.stylebook.ui.components.EmptyState
+import com.example.stylebook.ui.components.ScreenMasthead
+import com.example.stylebook.ui.viewmodel.WardrobeUiState
 
+/** Stateless: every value comes from [WardrobeUiState] and every change is reported through a callback. */
 @Composable
 fun WardrobeScreen(
-    items: List<ClothingItem>,
-    onItemClick: (ClothingItem) -> Unit,
-    onFavoriteClick: (Int) -> Unit
-) {
-    Column(modifier = Modifier.fillMaxSize()) {
-        WardrobeHeader(itemCount = items.size, favoriteCount = items.count { it.isFavorite })
-        if (items.isEmpty()) {
-            EmptyWardrobeMessage()
-        } else {
-            ClothingItemList(
-                items = items,
-                onItemClick = onItemClick,
-                onFavoriteClick = onFavoriteClick,
-                modifier = Modifier.weight(1f)
-            )
-        }
-    }
-}
-
-@Composable
-fun WardrobeHeader(itemCount: Int, favoriteCount: Int) {
-    Column(modifier = Modifier.padding(horizontal = 24.dp)) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(top = 20.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Text(
-                text = "THE EDIT",
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-            Text(
-                text = "NO. ${itemCount.toString().padStart(2, '0')}",
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-        }
-        Spacer(modifier = Modifier.height(10.dp))
-        Text(
-            text = "Stylebook",
-            style = MaterialTheme.typography.displaySmall,
-            color = MaterialTheme.colorScheme.onBackground
-        )
-        Text(
-            text = "A curated wardrobe journal",
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(top = 2.dp)
-        )
-        Spacer(modifier = Modifier.height(16.dp))
-        HorizontalDivider(thickness = 2.dp, color = MaterialTheme.colorScheme.primary)
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(vertical = 10.dp),
-            horizontalArrangement = Arrangement.SpaceBetween
-        ) {
-            Text(
-                text = "$itemCount PIECES",
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-            Text(
-                text = "$favoriteCount SAVED",
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.secondary
-            )
-        }
-        HorizontalDivider(thickness = 1.dp, color = MaterialTheme.colorScheme.outline)
-    }
-}
-
-@Composable
-fun ClothingItemList(
-    items: List<ClothingItem>,
+    state: WardrobeUiState,
+    onQueryChange: (String) -> Unit,
+    onCategorySelected: (Category?) -> Unit,
+    onFavoritesOnlyChange: (Boolean) -> Unit,
+    onClearFilters: () -> Unit,
     onItemClick: (ClothingItem) -> Unit,
     onFavoriteClick: (Int) -> Unit,
-    modifier: Modifier = Modifier
+    onAddItem: () -> Unit
 ) {
     LazyColumn(
-        modifier = modifier.fillMaxWidth(),
-        contentPadding = androidx.compose.foundation.layout.PaddingValues(
-            start = 24.dp,
-            end = 24.dp,
-            top = 4.dp,
-            bottom = 28.dp
-        )
+        modifier = Modifier.fillMaxSize(),
+        contentPadding = PaddingValues(bottom = 96.dp)
     ) {
-        itemsIndexed(items, key = { _, item -> item.id }) { index, item ->
-            ClothingItemCard(
-                item = item,
-                index = index + 1,
-                onClick = { onItemClick(item) },
-                onFavoriteClick = { onFavoriteClick(item.id) }
+        item(key = "masthead") {
+            ScreenMasthead(
+                eyebrow = "MY WARDROBE",
+                title = "The Edit",
+                subtitle = "Every piece you own, in one place.",
+                trailingEyebrow = "${state.allItems.size} PIECES"
             )
-            HorizontalDivider(thickness = 1.dp, color = MaterialTheme.colorScheme.outline)
+        }
+        item(key = "filters") {
+            WardrobeFilterBar(
+                query = state.filters.query,
+                selectedCategory = state.filters.category,
+                favoritesOnly = state.filters.favoritesOnly,
+                categoryCounts = state.categoryCounts,
+                onQueryChange = onQueryChange,
+                onCategorySelected = onCategorySelected,
+                onFavoritesOnlyChange = onFavoritesOnlyChange
+            )
+        }
+        item(key = "summary") {
+            ResultSummary(
+                shown = state.visibleItems.size,
+                total = state.allItems.size,
+                hasActiveFilters = state.hasActiveFilters,
+                onClearFilters = onClearFilters
+            )
+        }
+        if (state.visibleItems.isEmpty()) {
+            item(key = "empty") {
+                if (state.allItems.isEmpty()) {
+                    EmptyState(
+                        eyebrow = "THE PAGE IS BLANK",
+                        title = "Your first piece writes the story.",
+                        body = "Add clothes you own to start building outfits.",
+                        actionLabel = "Add a piece",
+                        onAction = onAddItem
+                    )
+                } else {
+                    EmptyState(
+                        eyebrow = "NOTHING HERE",
+                        title = "No pieces match.",
+                        body = "Try another word or category.",
+                        actionLabel = "Clear filters",
+                        onAction = onClearFilters
+                    )
+                }
+            }
+        }
+        items(state.visibleItems, key = { it.id }) { item ->
+            Column(modifier = Modifier.padding(horizontal = 24.dp)) {
+                ClothingItemRow(
+                    item = item,
+                    onClick = { onItemClick(item) },
+                    onFavoriteClick = { onFavoriteClick(item.id) }
+                )
+                HorizontalDivider(thickness = 1.dp, color = MaterialTheme.colorScheme.outline)
+            }
         }
     }
 }
 
 @Composable
-fun ClothingItemCard(
-    item: ClothingItem,
-    index: Int,
-    onClick: () -> Unit,
-    onFavoriteClick: () -> Unit
+fun WardrobeFilterBar(
+    query: String,
+    selectedCategory: Category?,
+    favoritesOnly: Boolean,
+    categoryCounts: Map<Category, Int>,
+    onQueryChange: (String) -> Unit,
+    onCategorySelected: (Category?) -> Unit,
+    onFavoritesOnlyChange: (Boolean) -> Unit,
+    modifier: Modifier = Modifier
 ) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickableNoRipple(onClick)
-            .padding(vertical = 18.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Text(
-            text = index.toString().padStart(2, '0'),
-            style = MaterialTheme.typography.titleLarge,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.width(38.dp)
+    val focusManager = LocalFocusManager.current
+    Column(modifier = modifier.padding(top = 16.dp)) {
+        OutlinedTextField(
+            value = query,
+            onValueChange = onQueryChange,
+            placeholder = { Text("Search name, color, occasion", style = MaterialTheme.typography.bodyLarge) },
+            leadingIcon = { Icon(Icons.Filled.Search, contentDescription = null) },
+            trailingIcon = {
+                if (query.isNotEmpty()) {
+                    IconButton(onClick = { onQueryChange("") }) {
+                        Icon(Icons.Filled.Clear, contentDescription = "Clear search")
+                    }
+                }
+            },
+            singleLine = true,
+            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+            keyboardActions = KeyboardActions(onSearch = { focusManager.clearFocus() }),
+            shape = RectangleShape,
+            colors = OutlinedTextFieldDefaults.colors(
+                focusedBorderColor = MaterialTheme.colorScheme.primary,
+                unfocusedBorderColor = MaterialTheme.colorScheme.outline,
+                focusedContainerColor = MaterialTheme.colorScheme.surface,
+                unfocusedContainerColor = MaterialTheme.colorScheme.surface
+            ),
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 24.dp)
         )
-        Box(
-            modifier = Modifier
-                .size(width = 76.dp, height = 92.dp)
-                .background(MaterialTheme.colorScheme.surface)
-                .border(1.dp, MaterialTheme.colorScheme.outline)
+        LazyRow(
+            contentPadding = PaddingValues(horizontal = 24.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            modifier = Modifier.padding(top = 10.dp)
         ) {
-            Image(
-                painter = painterResource(item.imageRes),
-                contentDescription = "${item.name} illustration",
-                contentScale = ContentScale.Fit,
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(6.dp)
-            )
-        }
-        Column(
-            modifier = Modifier
-                .weight(1f)
-                .padding(start = 16.dp)
-        ) {
-            Text(
-                text = item.category.uppercase(),
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.secondary
-            )
-            Text(
-                text = item.name,
-                style = MaterialTheme.typography.titleLarge,
-                color = MaterialTheme.colorScheme.onBackground,
-                fontWeight = FontWeight.Medium,
-                modifier = Modifier.padding(top = 4.dp)
-            )
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier.padding(top = 8.dp)
-            ) {
-                Box(
-                    modifier = Modifier
-                        .size(10.dp)
-                        .background(colorFor(item.color))
-                        .border(1.dp, MaterialTheme.colorScheme.outline)
+            item {
+                EditorialChip(
+                    label = "Favorites",
+                    selected = favoritesOnly,
+                    onClick = { onFavoritesOnlyChange(!favoritesOnly) },
+                    leading = { Icon(Icons.Filled.Favorite, contentDescription = null, modifier = Modifier.size(16.dp)) }
                 )
-                Spacer(modifier = Modifier.width(7.dp))
-                Text(
-                    text = item.color,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+            }
+            item {
+                EditorialChip(label = "All", selected = selectedCategory == null, onClick = { onCategorySelected(null) })
+            }
+            items(Category.entries) { category ->
+                EditorialChip(
+                    label = "${category.displayName} ${categoryCounts[category] ?: 0}",
+                    selected = selectedCategory == category,
+                    onClick = { onCategorySelected(if (selectedCategory == category) null else category) }
                 )
             }
         }
-        FavoriteButton(isFavorite = item.isFavorite, onClick = onFavoriteClick)
     }
 }
 
 @Composable
-fun FavoriteButton(isFavorite: Boolean, onClick: () -> Unit) {
-    Box(
-        modifier = Modifier
-            .size(40.dp)
-            .clickableNoRipple(onClick),
-        contentAlignment = Alignment.Center
-    ) {
-        Text(
-            text = if (isFavorite) "\u2605" else "\u2606",
-            color = if (isFavorite) MaterialTheme.colorScheme.secondary else MaterialTheme.colorScheme.onSurfaceVariant,
-            fontSize = 22.sp
-        )
-    }
-}
-
-@Composable
-private fun EmptyWardrobeMessage() {
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(32.dp),
-        contentAlignment = Alignment.Center
-    ) {
-        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+private fun ResultSummary(shown: Int, total: Int, hasActiveFilters: Boolean, onClearFilters: () -> Unit) {
+    Column(modifier = Modifier.padding(horizontal = 24.dp)) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween,
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(top = 4.dp)
+        ) {
             Text(
-                text = "THE PAGE IS BLANK",
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
+                text = if (hasActiveFilters) "SHOWING $shown OF $total" else "ALL $total PIECES",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(vertical = 14.dp)
             )
-            Text(
-                text = "Your first piece\nwrites the story.",
-                style = MaterialTheme.typography.headlineSmall,
-                color = MaterialTheme.colorScheme.onBackground,
-                modifier = Modifier.padding(top = 12.dp)
-            )
+            if (hasActiveFilters) {
+                TextButton(onClick = onClearFilters) {
+                    Text("CLEAR", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.secondary)
+                }
+            }
         }
+        HorizontalDivider(thickness = 1.dp, color = MaterialTheme.colorScheme.outline)
     }
-}
-
-private fun colorFor(colorName: String): Color = when (colorName.lowercase()) {
-    "ivory", "cream", "white" -> Color(0xFFEDE6D7)
-    "indigo", "navy", "blue" -> Color(0xFF3C4A63)
-    "sand", "beige", "tan" -> Color(0xFFC5A982)
-    "sage", "green" -> Color(0xFF7E8B76)
-    "black", "charcoal" -> Color(0xFF2A2825)
-    "red", "burgundy" -> Color(0xFF8E3B34)
-    else -> Color(0xFF9A8576)
 }
