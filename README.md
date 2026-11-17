@@ -11,15 +11,19 @@ You keep a digital catalogue of your pieces. You can search, filter and sort it,
 
 ### Additional feature: Wear Diary
 
-| Log a look ("Wear today") | Diary: stats, forgotten pieces, log | Wear stats on a piece + sort by wear |
+| Log a look ("Wear today") | Diary: stats, forgotten pieces, log | Wardrobe sorted by "Most worn" |
 |---|---|---|
-| ![Wear today](screenshots/07-wear-today.png) | ![Diary](screenshots/08-diary.png) | ![Wear stats](screenshots/09-wear-stats.png) |
+| ![Wear today](screenshots/07-wear-today.png) | ![Diary](screenshots/08-diary.png) | ![Sort by wear](screenshots/09-sort-by-wear.png) |
+
+1. **Wear today**: the look on the generator is logged; the button turns into *In today's diary*.
+2. **Diary**: entries this month, pieces worn (10/13), most-worn piece, forgotten pieces and the day-by-day log.
+3. **Sort by wear**: the wardrobe is ordered by how often each piece appears in the diary.
 
 ### CRUD
 
-| Edit a piece | Delete confirmation | Diary entry delete confirmation |
+| Item detail with wear stats | Delete confirmation | Edit a piece |
 |---|---|---|
-| ![Edit piece](screenshots/10-edit-piece.png) | ![Delete dialog](screenshots/11-delete-dialog.png) | ![Diary delete](screenshots/12-diary-delete.png) |
+| ![Item detail](screenshots/10-item-detail-worn.png) | ![Delete dialog](screenshots/11-delete-dialog.png) | ![Edit piece](screenshots/12-edit-piece.png) |
 
 ### Earlier homework screens (all still functional)
 
@@ -190,14 +194,10 @@ export JAVA_HOME="/Applications/Android Studio.app/Contents/jbr/Contents/Home"
 - `OutfitViewModelTest`: first look after load, save + duplicates, locks, *Style this piece*, delete rebuilds the look, **wear today once per day**, **saved look marked as worn**.
 - `DiaryViewModelTest`: grouping by day, most-worn and forgotten pieces, delete entry, wear again.
 
-**Instrumented tests** in `app/src/androidTest/`. `OfflineWardrobeRepositoryTest` runs on an in-memory Room database and covers CRUD, ordering, duplicate rejection, cascade on delete with restore, and deleting a diary entry.
+**Instrumented tests (6)** in `app/src/androidTest/`. `OfflineWardrobeRepositoryTest` runs on an in-memory Room database and covers CRUD, ordering, duplicate rejection, cascade on delete with restore, and deleting a diary entry.
 
 ## Limitations
 
 - Garment images are tinted vector illustrations chosen by category. Taking photos is not implemented.
 - The outfit generator is rule-based (slots, occasion, color harmony), not machine learning.
 - The database schema is version 1 with `exportSchema = false`. A future schema change needs a `Migration`.
-
-## Defense material
-
-The demo script and defense notes are in **[docs/DEFENSE.md](docs/DEFENSE.md)**.
