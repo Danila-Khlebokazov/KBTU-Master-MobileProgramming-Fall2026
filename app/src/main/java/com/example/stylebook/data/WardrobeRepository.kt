@@ -1,92 +1,63 @@
 package com.example.stylebook.data
 
+import com.example.stylebook.data.local.ClothingItemEntity
+import com.example.stylebook.data.local.SavedOutfitEntity
+import com.example.stylebook.data.local.WearLogEntity
 import com.example.stylebook.data.model.Category
 import com.example.stylebook.data.model.ClothingColor
 import com.example.stylebook.data.model.ClothingItem
 import com.example.stylebook.data.model.Occasion
 import com.example.stylebook.data.model.Outfit
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.update
+import com.example.stylebook.data.model.WearEntry
+import java.time.LocalDate
+import kotlinx.coroutines.flow.Flow
 
 /** Everything removed by [WardrobeRepository.deleteItem], kept so the deletion can be undone. */
-data class DeletedItem(val item: ClothingItem, val index: Int, val removedOutfits: List<Outfit>)
+data class DeletedItem(
+    val item: ClothingItemEntity,
+    val outfits: List<SavedOutfitEntity>,
+    val wears: List<WearLogEntity>
+)
 
 /**
- * Single source of truth for wardrobe pieces and saved outfits.
- *
- * Data lives in memory only: it survives configuration changes and screen navigation,
- * but is reset to the sample wardrobe when the app process is restarted.
- * Swapping the internals for Room/DataStore later will not change the public API.
+ * Single source of truth for wardrobe pieces, saved looks and the wear diary.
+ * Every list is a [Flow] that emits again whenever the stored data changes.
  */
-class WardrobeRepository(initialItems: List<ClothingItem> = SampleClothingData.items) {
+interface WardrobeRepository {
+    /** Newest first. */
+    val items: Flow<List<ClothingItem>>
 
-    private val _items = MutableStateFlow(initialItems)
-    val items: StateFlow<List<ClothingItem>> = _items.asStateFlow()
+    /** Newest first. */
+    val savedOutfits: Flow<List<Outfit>>
 
-    private val _savedOutfits = MutableStateFlow<List<Outfit>>(emptyList())
-    val savedOutfits: StateFlow<List<Outfit>> = _savedOutfits.asStateFlow()
+    /** Most recent day first. */
+    val wearLog: Flow<List<WearEntry>>
 
-    fun addItem(
+    suspend fun addItem(name: String, category: Category, color: ClothingColor, occasions: Set<Occasion>): ClothingItem
+
+    /** Returns the updated piece, or null if it no longer exists. Saved looks using it are removed if it changes slot. */
+    suspend fun updateItem(
+        id: Int,
         name: String,
         category: Category,
         color: ClothingColor,
         occasions: Set<Occasion>
-    ): ClothingItem {
-        lateinit var added: ClothingItem
-        _items.update { current ->
-            val nextId = (current.maxOfOrNull { it.id } ?: 0) + 1
-            added = ClothingItem(nextId, name, category, color, occasions, category.defaultImageRes)
-            listOf(added) + current
-        }
-        return added
-    }
+    ): ClothingItem?
 
-    fun toggleFavorite(itemId: Int) {
-        _items.update { current ->
-            current.map { if (it.id == itemId) it.copy(isFavorite = !it.isFavorite) else it }
-        }
-    }
+    suspend fun toggleFavorite(itemId: Int)
 
-    /** Removes a piece and every saved outfit that used it. */
-    fun deleteItem(itemId: Int): DeletedItem? {
-        val index = _items.value.indexOfFirst { it.id == itemId }
-        if (index < 0) return null
-        val item = _items.value[index]
-        val affectedOutfits = _savedOutfits.value.filter { it.contains(itemId) }
-        _items.update { current -> current.filterNot { it.id == itemId } }
-        _savedOutfits.update { current -> current.filterNot { it.contains(itemId) } }
-        return DeletedItem(item, index, affectedOutfits)
-    }
+    /** Removes a piece together with every saved look and diary entry that used it. */
+    suspend fun deleteItem(itemId: Int): DeletedItem?
 
-    fun restore(deleted: DeletedItem) {
-        _items.update { current ->
-            if (current.any { it.id == deleted.item.id }) current
-            else current.toMutableList().apply { add(deleted.index.coerceAtMost(size), deleted.item) }
-        }
-        _savedOutfits.update { current ->
-            (current + deleted.removedOutfits.filterNot { removed -> current.any { it.id == removed.id } })
-                .sortedByDescending { it.id }
-        }
-    }
+    suspend fun restore(deleted: DeletedItem)
 
     /** Saves [outfit] unless the same combination of pieces is already saved. Returns the stored copy or null. */
-    fun saveOutfit(outfit: Outfit): Outfit? {
-        if (isSaved(outfit)) return null
-        var saved: Outfit? = null
-        _savedOutfits.update { current ->
-            val nextId = (current.maxOfOrNull { it.id } ?: 0) + 1
-            val stored = outfit.copy(id = nextId)
-            saved = stored
-            listOf(stored) + current
-        }
-        return saved
-    }
+    suspend fun saveOutfit(outfit: Outfit): Outfit?
 
-    fun removeOutfit(outfitId: Int) {
-        _savedOutfits.update { current -> current.filterNot { it.id == outfitId } }
-    }
+    suspend fun removeOutfit(outfitId: Int)
 
-    fun isSaved(outfit: Outfit): Boolean = _savedOutfits.value.any { it.hasSamePiecesAs(outfit) }
+    /** Adds [outfit] to the diary for [date]. Returns false if exactly this look is already logged that day. */
+    suspend fun logWear(outfit: Outfit, date: LocalDate): Boolean
+
+    suspend fun deleteWearEntry(entryId: Int)
 }

@@ -12,6 +12,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.outlined.Lock
@@ -22,6 +24,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedCard
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -113,7 +116,9 @@ private fun OutfitPieceRow(
 @Composable
 fun SavedOutfitCard(
     outfit: Outfit,
+    wornToday: Boolean,
     onPieceClick: (ClothingItem) -> Unit,
+    onWearToday: () -> Unit,
     onRemove: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -141,37 +146,60 @@ fun SavedOutfitCard(
                     Icon(Icons.Filled.Delete, contentDescription = "Remove look", tint = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            OutfitPiecesStrip(outfit = outfit, onPieceClick = onPieceClick, modifier = Modifier.padding(top = 12.dp))
+            WearTodayButton(wornToday = wornToday, onClick = onWearToday, modifier = Modifier.padding(top = 4.dp))
+        }
+    }
+}
+
+/** Logs a look in today's diary; shows a check once it is logged. */
+@Composable
+fun WearTodayButton(wornToday: Boolean, onClick: () -> Unit, modifier: Modifier = Modifier) {
+    TextButton(onClick = onClick, enabled = !wornToday, modifier = modifier) {
+        Icon(
+            imageVector = if (wornToday) Icons.Filled.CheckCircle else Icons.Filled.DateRange,
+            contentDescription = null,
+            tint = if (wornToday) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.secondary,
+            modifier = Modifier.size(18.dp)
+        )
+        Spacer(modifier = Modifier.width(8.dp))
+        Text(
+            text = if (wornToday) "IN TODAY'S DIARY" else "WEAR TODAY",
+            style = MaterialTheme.typography.labelMedium,
+            color = if (wornToday) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.secondary
+        )
+    }
+}
+
+/** The pieces of a look side by side, head to toe. Three-piece looks keep the same width as four-piece ones. */
+@Composable
+fun OutfitPiecesStrip(outfit: Outfit, onPieceClick: (ClothingItem) -> Unit, modifier: Modifier = Modifier) {
+    Row(
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        modifier = modifier.fillMaxWidth()
+    ) {
+        outfit.pieces.forEach { piece ->
+            Column(
                 modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(top = 12.dp)
+                    .weight(1f)
+                    .clickable { onPieceClick(piece) }
             ) {
-                outfit.pieces.forEach { piece ->
-                    Column(
-                        modifier = Modifier
-                            .weight(1f)
-                            .clickable { onPieceClick(piece) }
-                    ) {
-                        GarmentImage(
-                            item = piece,
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .aspectRatio(0.85f)
-                        )
-                        Text(
-                            text = piece.name,
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onBackground,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                            modifier = Modifier.padding(top = 4.dp)
-                        )
-                    }
-                }
-                // Keeps three-piece looks the same width as four-piece ones.
-                repeat(4 - outfit.pieces.size) { Spacer(modifier = Modifier.weight(1f)) }
+                GarmentImage(
+                    item = piece,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .aspectRatio(0.85f)
+                )
+                Text(
+                    text = piece.name,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onBackground,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.padding(top = 4.dp)
+                )
             }
         }
+        repeat(4 - outfit.pieces.size) { Spacer(modifier = Modifier.weight(1f)) }
     }
 }

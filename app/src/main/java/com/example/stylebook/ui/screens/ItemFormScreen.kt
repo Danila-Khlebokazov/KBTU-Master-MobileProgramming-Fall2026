@@ -35,39 +35,42 @@ import com.example.stylebook.data.model.Category
 import com.example.stylebook.data.model.ClothingColor
 import com.example.stylebook.data.model.ClothingItem
 import com.example.stylebook.data.model.Occasion
-import com.example.stylebook.domain.AddItemErrors
-import com.example.stylebook.domain.AddItemForm
 import com.example.stylebook.domain.ClothingItemValidator
+import com.example.stylebook.domain.ItemForm
+import com.example.stylebook.domain.ItemFormErrors
 import com.example.stylebook.ui.components.BackHeader
 import com.example.stylebook.ui.components.ColorChoice
 import com.example.stylebook.ui.components.EditorialChip
 import com.example.stylebook.ui.components.GarmentImage
 import com.example.stylebook.ui.components.PrimaryActionButton
 import com.example.stylebook.ui.components.ScreenMasthead
-import com.example.stylebook.ui.viewmodel.AddItemResult
+import com.example.stylebook.ui.viewmodel.SaveItemResult
 
 /**
+ * Create a new piece ([initial] == null) or edit an existing one.
  * Form values are local UI state kept with [rememberSaveable], so a half-filled form survives rotation.
  * Validation and saving are delegated to the ViewModel through [onValidate] and [onSave].
  */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-fun AddItemScreen(
-    onValidate: (AddItemForm) -> AddItemErrors,
-    onSave: (AddItemForm) -> AddItemResult,
-    onSaved: (ClothingItem) -> Unit,
+fun ItemFormScreen(
+    initial: ClothingItem?,
+    onValidate: (ItemForm) -> ItemFormErrors,
+    onSave: (ItemForm) -> SaveItemResult,
+    onSaved: () -> Unit,
     onBack: () -> Unit
 ) {
-    var name by rememberSaveable { mutableStateOf("") }
-    var category by rememberSaveable { mutableStateOf<Category?>(null) }
-    var color by rememberSaveable { mutableStateOf<ClothingColor?>(null) }
-    var occasions by rememberSaveable { mutableStateOf(emptySet<Occasion>()) }
+    var name by rememberSaveable { mutableStateOf(initial?.name ?: "") }
+    var category by rememberSaveable { mutableStateOf(initial?.category) }
+    var color by rememberSaveable { mutableStateOf(initial?.color) }
+    var occasions by rememberSaveable { mutableStateOf(initial?.occasions ?: emptySet()) }
     // Errors are only shown after the first save attempt, then update live as the user fixes them.
     var submitted by rememberSaveable { mutableStateOf(false) }
 
-    val form = AddItemForm(name, category, color, occasions)
-    val errors = if (submitted) onValidate(form) else AddItemErrors()
+    val form = ItemForm(name, category, color, occasions)
+    val errors = if (submitted) onValidate(form) else ItemFormErrors()
     val focusManager = LocalFocusManager.current
+    val isEditing = initial != null
 
     Column(modifier = Modifier.fillMaxSize()) {
         BackHeader(label = "BACK", onBack = onBack)
@@ -76,9 +79,13 @@ fun AddItemScreen(
                 .fillMaxSize()
                 .verticalScroll(rememberScrollState())
         ) {
-            ScreenMasthead(eyebrow = "ADD TO WARDROBE", title = "New Piece", subtitle = "Record something you own.")
+            if (initial != null) {
+                ScreenMasthead(eyebrow = "EDIT PIECE", title = "Edit Piece", subtitle = "Update the details of ${initial.name}.")
+            } else {
+                ScreenMasthead(eyebrow = "ADD TO WARDROBE", title = "New Piece", subtitle = "Record something you own.")
+            }
 
-            PiecePreview(form = form, modifier = Modifier.padding(horizontal = 24.dp, vertical = 20.dp))
+            PiecePreview(form = form, initial = initial, modifier = Modifier.padding(horizontal = 24.dp, vertical = 20.dp))
 
             Column(modifier = Modifier.padding(horizontal = 24.dp)) {
                 FieldLabel("01 — NAME", errors.name)
@@ -142,12 +149,12 @@ fun AddItemScreen(
 
                 Spacer(modifier = Modifier.height(28.dp))
                 PrimaryActionButton(
-                    text = "Save to wardrobe",
+                    text = if (isEditing) "Save changes" else "Save to wardrobe",
                     onClick = {
                         focusManager.clearFocus()
-                        when (val result = onSave(form)) {
-                            is AddItemResult.Added -> onSaved(result.item)
-                            is AddItemResult.Invalid -> submitted = true
+                        when (onSave(form)) {
+                            SaveItemResult.Saved -> onSaved()
+                            is SaveItemResult.Invalid -> submitted = true
                         }
                     },
                     modifier = Modifier.fillMaxWidth()
@@ -167,7 +174,7 @@ fun AddItemScreen(
 }
 
 @Composable
-private fun PiecePreview(form: AddItemForm, modifier: Modifier = Modifier) {
+private fun PiecePreview(form: ItemForm, initial: ClothingItem?, modifier: Modifier = Modifier) {
     val previewCategory = form.category ?: Category.TOPS
     val previewItem = ClothingItem(
         id = 0,
@@ -175,7 +182,7 @@ private fun PiecePreview(form: AddItemForm, modifier: Modifier = Modifier) {
         category = previewCategory,
         color = form.color ?: ClothingColor.IVORY,
         occasions = form.occasions,
-        imageRes = previewCategory.defaultImageRes
+        art = initial?.art?.takeIf { initial.category == previewCategory } ?: previewCategory.defaultArt
     )
     Row(verticalAlignment = Alignment.CenterVertically, modifier = modifier.fillMaxWidth()) {
         GarmentImage(item = previewItem, innerPadding = 10.dp, modifier = Modifier.size(width = 96.dp, height = 112.dp))

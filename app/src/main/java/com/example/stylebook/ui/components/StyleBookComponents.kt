@@ -22,6 +22,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.FavoriteBorder
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -55,8 +56,47 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.stylebook.data.model.ClothingColor
 import com.example.stylebook.data.model.ClothingItem
+import java.time.LocalDate
+import java.time.format.DateTimeFormatter
 
 fun ClothingColor.toColor(): Color = Color(argb)
+
+private val dayFormatter = DateTimeFormatter.ofPattern("EEE, d MMM yyyy")
+
+/** "Today", "Yesterday" or a full date such as "Mon, 9 Nov 2026". */
+fun dayLabel(date: LocalDate, today: LocalDate): String = when (date) {
+    today -> "Today"
+    today.minusDays(1) -> "Yesterday"
+    else -> date.format(dayFormatter)
+}
+
+/** Destructive actions always go through this dialog before anything is deleted. */
+@Composable
+fun ConfirmDialog(
+    title: String,
+    text: String,
+    confirmLabel: String,
+    onConfirm: () -> Unit,
+    onDismiss: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        shape = RectangleShape,
+        containerColor = MaterialTheme.colorScheme.background,
+        title = { Text(title, style = MaterialTheme.typography.headlineSmall) },
+        text = { Text(text, style = MaterialTheme.typography.bodyLarge) },
+        confirmButton = {
+            TextButton(onClick = onConfirm) {
+                Text(confirmLabel.uppercase(), style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.error)
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("CANCEL", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onBackground)
+            }
+        }
+    )
+}
 
 /** Garment illustration, tinted with the piece's color so every item looks like itself. */
 @Composable
@@ -331,7 +371,8 @@ fun ClothingItemRow(
     item: ClothingItem,
     onClick: () -> Unit,
     onFavoriteClick: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    detail: String? = null
 ) {
     Card(
         onClick = onClick,
@@ -375,6 +416,14 @@ fun ClothingItemRow(
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
+                    )
+                }
+                if (detail != null) {
+                    Text(
+                        text = detail.uppercase(),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.secondary,
+                        modifier = Modifier.padding(top = 6.dp)
                     )
                 }
             }

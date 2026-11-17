@@ -38,6 +38,7 @@ import com.example.stylebook.ui.components.ClothingItemRow
 import com.example.stylebook.ui.components.EditorialChip
 import com.example.stylebook.ui.components.EmptyState
 import com.example.stylebook.ui.components.ScreenMasthead
+import com.example.stylebook.ui.viewmodel.WardrobeSort
 import com.example.stylebook.ui.viewmodel.WardrobeUiState
 
 /** Stateless: every value comes from [WardrobeUiState] and every change is reported through a callback. */
@@ -47,6 +48,7 @@ fun WardrobeScreen(
     onQueryChange: (String) -> Unit,
     onCategorySelected: (Category?) -> Unit,
     onFavoritesOnlyChange: (Boolean) -> Unit,
+    onSortSelected: (WardrobeSort) -> Unit,
     onClearFilters: () -> Unit,
     onItemClick: (ClothingItem) -> Unit,
     onFavoriteClick: (Int) -> Unit,
@@ -75,6 +77,9 @@ fun WardrobeScreen(
                 onFavoritesOnlyChange = onFavoritesOnlyChange
             )
         }
+        item(key = "sort") {
+            SortBar(selected = state.filters.sort, onSortSelected = onSortSelected)
+        }
         item(key = "summary") {
             ResultSummary(
                 shown = state.visibleItems.size,
@@ -83,6 +88,7 @@ fun WardrobeScreen(
                 onClearFilters = onClearFilters
             )
         }
+        if (state.isLoading) return@LazyColumn
         if (state.visibleItems.isEmpty()) {
             item(key = "empty") {
                 if (state.allItems.isEmpty()) {
@@ -105,11 +111,17 @@ fun WardrobeScreen(
             }
         }
         items(state.visibleItems, key = { it.id }) { item ->
-            Column(modifier = Modifier.padding(horizontal = 24.dp)) {
+            val showWear = state.filters.sort == WardrobeSort.MOST_WORN || state.filters.sort == WardrobeSort.LEAST_WORN
+            Column(
+                modifier = Modifier
+                    .animateItem()
+                    .padding(horizontal = 24.dp)
+            ) {
                 ClothingItemRow(
                     item = item,
                     onClick = { onItemClick(item) },
-                    onFavoriteClick = { onFavoriteClick(item.id) }
+                    onFavoriteClick = { onFavoriteClick(item.id) },
+                    detail = if (showWear) wearLabel(state.wearStatsFor(item.id).count) else null
                 )
                 HorizontalDivider(thickness = 1.dp, color = MaterialTheme.colorScheme.outline)
             }
@@ -179,6 +191,32 @@ fun WardrobeFilterBar(
                     onClick = { onCategorySelected(if (selectedCategory == category) null else category) }
                 )
             }
+        }
+    }
+}
+
+private fun wearLabel(count: Int): String = when (count) {
+    0 -> "Never worn"
+    1 -> "Worn once"
+    else -> "Worn $count times"
+}
+
+@Composable
+private fun SortBar(selected: WardrobeSort, onSortSelected: (WardrobeSort) -> Unit) {
+    LazyRow(
+        contentPadding = PaddingValues(horizontal = 24.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        item {
+            Text(
+                "SORT",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+        items(WardrobeSort.entries) { sort ->
+            EditorialChip(label = sort.label, selected = selected == sort, onClick = { onSortSelected(sort) })
         }
     }
 }

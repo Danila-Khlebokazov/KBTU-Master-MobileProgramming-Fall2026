@@ -1,13 +1,27 @@
-# StyleBook — Digital Wardrobe (Midterm Project)
+# StyleBook — Digital Wardrobe (HW3: MVVM + Room)
 
 StyleBook is a native Android app, built with **Kotlin** and **Jetpack Compose**, that helps you answer *"what do I wear today?"* using only the clothes you already own.
 
-You keep a digital catalogue of your pieces. You can search and filter it, and add new items through a validated form. A rule-based **Outfit Generator** builds complete looks from your wardrobe and explains why each combination works. Looks and pieces you like can be saved to **Favorites**.
+You keep a digital catalogue of your pieces. You can search, filter and sort it, and add or edit pieces through a validated form. A rule-based **Outfit Generator** builds complete looks from your wardrobe and explains why each combination works. You can save looks you like to **Favorites**. The **Wear Diary** records what you actually wore and points out the pieces you have forgotten about.
 
 > The whole app runs offline. It needs no backend, no network and no API keys, and all images are local vector drawables.
-> **Data lives in memory only.** It survives screen rotation, but it resets to the sample wardrobe when the app process is restarted. See [Limitations](#limitations).
+> **All data is stored in a Room database.** Pieces, favorites, saved looks and the diary are still there after you close and restart the app.
 
 ## Screenshots
+
+### Additional feature: Wear Diary
+
+| Log a look ("Wear today") | Diary: stats, forgotten pieces, log | Wear stats on a piece + sort by wear |
+|---|---|---|
+| ![Wear today](screenshots/07-wear-today.png) | ![Diary](screenshots/08-diary.png) | ![Wear stats](screenshots/09-wear-stats.png) |
+
+### CRUD
+
+| Edit a piece | Delete confirmation | Diary entry delete confirmation |
+|---|---|---|
+| ![Edit piece](screenshots/10-edit-piece.png) | ![Delete dialog](screenshots/11-delete-dialog.png) | ![Diary delete](screenshots/12-diary-delete.png) |
+
+### Earlier homework screens (all still functional)
 
 | Home | My Wardrobe | Add a Piece |
 |---|---|---|
@@ -15,22 +29,29 @@ You keep a digital catalogue of your pieces. You can search and filter it, and a
 | **Outfit Generator** | **Favorites** | **Item Detail** |
 | ![Outfit generator](screenshots/04-outfit-generator.png) | ![Favorites](screenshots/05-favorites.png) | ![Item detail](screenshots/06-item-detail.png) |
 
-1. **Home**: wardrobe stats, today's generated look with *Shuffle*, category shortcuts, and recently added pieces.
-2. **My Wardrobe**: live search plus category and favorite filters on a `LazyColumn`.
-3. **Add a Piece**: form with inline validation (name, category, color, occasions).
-4. **Outfit Generator**: a *Work* look with the Linen Shirt locked, the layer toggle, and the "Why it works" notes.
-5. **Favorites**: saved looks (with remove + undo). A second tab shows favorite pieces.
-6. **Item Detail**: piece info, *Style this piece*, favorite, and remove with undo.
-
 ## Features
 
 | # | Feature | What the user can do |
 |---|---|---|
-| 1 | **Wardrobe catalogue** | Browse every piece. Search by name, category, color or occasion. Filter by category chip or favorites only. A friendly empty state appears when nothing matches. |
-| 2 | **Add Clothing Item** | Add a piece with name, category, color and occasions. Validation covers required fields, name length (2–30 characters), and duplicate names within the same category. Errors appear inline only after the first submit. A snackbar confirms the save. |
-| 3 | **Outfit Generator** | Builds a top + bottom + shoes (+ optional layer) look **only from pieces you own**. You can pick an occasion (Any, Casual, Work, Evening), toggle the layer, **lock** pieces you want to keep, and **shuffle** the rest. The generator applies color harmony: at most one accent color, with neutrals around it. It also avoids repeating the previous look and shows a *"Why it works"* explanation. If the wardrobe lacks a required category, it says which pieces are missing. |
-| 4 | **Favorites** | Save generated looks (duplicates are detected) and favorite individual pieces. Both are shown on one screen with two tabs. Saved looks can be removed with **Undo**. |
-| 5 | **Item detail** | See a piece's color, occasions and how many saved looks use it. *Style this piece* opens the generator with that piece locked. You can also favorite it, or **remove** it with **Undo**. Undo also restores any saved looks that used the piece. |
+| 1 | **Wardrobe catalogue** | Browse every piece in a `LazyColumn` with stable keys (`key = { it.id }`). Search by name, category, color or occasion. Filter by category chip or favorites only. **Sort** by Newest, A–Z, Most worn or Least worn. A friendly empty state appears when nothing matches. |
+| 2 | **Create / edit a piece** | One form for both. Fields are name, category, color and occasions. Validation covers required fields, name length (2–30 characters), and duplicate names within the same category (a piece being edited is not its own duplicate). Errors appear inline only after the first submit. |
+| 3 | **Delete with confirmation** | *Remove from wardrobe* opens a dialog that says how many saved looks and diary entries will also be removed. After you confirm, a snackbar offers **Undo**, which restores the piece and all related rows. |
+| 4 | **Outfit Generator** | Builds a top + bottom + shoes (+ optional layer) look **only from pieces you own**. Choose an occasion, toggle the layer, **lock** pieces and **shuffle** the rest. It uses color harmony (at most one accent color) and shows a *"Why it works"* explanation. |
+| 5 | **Favorites** | Save generated looks (duplicates are detected) and favorite individual pieces. Saved looks can be removed with **Undo**. |
+| 6 | **Item detail** | See color, occasions, how many saved looks use the piece, and **how often and when it was last worn**. Actions: *Style this piece*, favorite, **Edit**, **Remove**. |
+| 7 | **Wear Diary (additional feature)** | See [below](#additional-feature-wear-diary). |
+
+### Additional feature: Wear Diary
+
+This feature spans several screens and interactions, changes state, and stores its data in Room (`wear_log` table):
+
+1. **Log a look.** *Wear today* on the generator, or on any saved look in Favorites, writes an entry for today. Logging the same look twice on one day is rejected, and the button changes to *In today's diary*.
+2. **Diary tab.** A `LazyColumn` of entries grouped by day (*Today*, *Yesterday*, dates), with stable keys `day-<epochDay>` and `wear-<id>`. Three statistics are shown: looks logged this month, pieces worn out of the total, and the most-worn piece.
+3. **Forgotten pieces.** Pieces never worn, or not worn for 30+ days, appear oldest-first in a carousel. Tap one, then *Style this piece*, to build a look around it.
+4. **Wear again.** Copies a look from an earlier day to today.
+5. **Delete an entry.** A confirmation dialog appears first. The pieces and saved looks are kept.
+6. **Everywhere else.** Item detail shows *"3× · last yesterday"*, and Wardrobe can sort by *Most worn / Least worn*. Every screen updates the moment a look is logged, because they all observe the same Room `Flow`.
+7. **Consistency.** Deleting a piece also deletes the diary entries that used it, and *Undo* brings them back.
 
 ## Tech stack
 
@@ -40,75 +61,104 @@ You keep a digital catalogue of your pieces. You can search and filter it, and a
 | UI | Jetpack Compose (BOM 2026.02.01), Material 3 |
 | Navigation | Navigation Compose 2.10.2 |
 | State | `ViewModel`, `StateFlow`, `collectAsStateWithLifecycle()` (lifecycle 2.11.0) |
+| Persistence | **Room 2.8.4** (KSP 2.3.4), `Flow` queries, `withTransaction` |
 | Async | Kotlin Coroutines (`viewModelScope`, `Channel`, `combine`, `stateIn`) |
-| Tests | JUnit 4 + `kotlinx-coroutines-test` 1.9.0 |
+| Dates | `java.time.LocalDate` (core library desugaring for API 24–25) |
+| Tests | JUnit 4 + `kotlinx-coroutines-test`; instrumented Room tests |
 | Build | AGP 9.4.1, compileSdk/targetSdk 37, minSdk 24 |
-| Package | `com.example.stylebook` |
 
-## Architecture
+## Architecture (MVVM)
 
 ```
 ┌──────────────────────── UI layer (Compose) ────────────────────────┐
 │ StyleBookApp: NavHost, bottom bar, FAB, Snackbar                   │
 │ screens/*: stateless, receive state + callbacks                    │
-│ components/*: reusable composables                                 │
+│ components/*: reusable composables (ConfirmDialog, OutfitPieces…)  │
 └──────────────▲─────────────────────────────────┬───────────────────┘
                │ StateFlow<UiState>              │ events (onClick…)
                │ collectAsStateWithLifecycle()   ▼
 ┌──────────────┴──────────── ViewModels ─────────────────────────────┐
-│ WardrobeViewModel: search/filters, add, favorite, delete + undo    │
-│ OutfitViewModel: generate, lock, shuffle, save/remove looks        │
+│ WardrobeViewModel: search/filter/sort, create, edit, delete + undo │
+│ OutfitViewModel:   generate, lock, save looks, wear today          │
+│ DiaryViewModel:    diary by day, stats, forgotten, delete, again   │
 └──────────────▲─────────────────────────────────┬───────────────────┘
-               │ StateFlow (items, savedOutfits) │ calls
-┌──────────────┴──── Data + Domain (plain Kotlin, no Android UI) ────┐
-│ WardrobeRepository: single source of truth (in memory)             │
-│ OutfitGenerator: pure outfit rules (testable, injectable Random)   │
-│ ClothingItemValidator: form validation rules                       │
-│ Models: ClothingItem, Outfit, Category, ClothingColor, Occasion    │
+               │ Flow<List<…>>                   │ suspend calls
+┌──────────────┴──────────── Repository ─────────────────────────────┐
+│ WardrobeRepository (interface)                                     │
+│ OfflineWardrobeRepository: maps entities ↔ models, transactions    │
+└──────────────▲─────────────────────────────────┬───────────────────┘
+               │ Flow (re-emits on table change) │ @Insert/@Update/@Query
+┌──────────────┴──────────── Data source (Room) ─────────────────────┐
+│ StyleBookDatabase (seeded once with sample wardrobe)               │
+│ Entities: ClothingItemEntity, SavedOutfitEntity, WearLogEntity     │
+│ DAOs: ClothingItemDao, SavedOutfitDao, WearLogDao                  │
 └────────────────────────────────────────────────────────────────────┘
+  domain/: OutfitGenerator, ClothingItemValidator, WearStats (pure Kotlin)
 ```
 
-- **Unidirectional data flow.** State flows down from Repository → ViewModel → UI, and events flow up from UI → ViewModel → Repository.
-- Both ViewModels observe the **same repository** (provided by `AppContainer`). A piece added on the Add screen therefore shows up immediately in the Wardrobe, on Home and in the generator.
-- Business rules (`OutfitGenerator`, `ClothingItemValidator`) contain no Compose or Android code, so they are unit-tested directly.
+- **Unidirectional data flow.** Composables never change data directly. They call ViewModel methods, the ViewModel calls `suspend` repository functions in `viewModelScope`, Room writes the change, and the DAO `Flow`s emit again. The `StateFlow`s are recomputed and Compose recomposes. **No screen refreshes manually.**
+- **One repository for every ViewModel** (provided by `AppContainer`, created in `StyleBookApplication`, injected with `AppViewModelProvider.Factory`). A change made on one screen therefore shows up on all others immediately.
+- **Navigation and configuration changes.** ViewModels are Activity-scoped and survive rotation. Form fields and open dialogs use `rememberSaveable`. The data itself lives in Room, so it also survives process death and app restarts.
+- **Loading state.** The UI states start with `isLoading = true`. The detail and edit routes wait for the first database result before deciding that a piece no longer exists.
+
+### Room schema
+
+| Table | Columns | Notes |
+|---|---|---|
+| `clothing_items` | id (PK, auto), name, category, color, occasions, art, isFavorite, addedAt | `occasions` stored as `"CASUAL,WORK"` (TypeConverter). Listed `ORDER BY addedAt DESC`. |
+| `saved_outfits` | id, topId, bottomId, shoesId, outerwearId?, occasion? | Foreign keys → `clothing_items` with `CASCADE`. |
+| `wear_log` | id, wornOn (epoch day), topId, bottomId, shoesId, outerwearId?, occasion? | Foreign keys → `clothing_items` with `CASCADE`. Indexed by `wornOn`. |
+
+### CRUD → UI mapping
+
+| Operation | Pieces | Saved looks | Diary |
+|---|---|---|---|
+| **Create** | Add form (FAB / Home) | *Save look* in generator | *Wear today* (generator, Favorites), *Wear again* (Diary) |
+| **Read** | Wardrobe, Home, Detail (`Flow`) | Favorites, generator state | Diary, Detail stats, Wardrobe sort |
+| **Update** | Edit form, favorite heart | — | — |
+| **Delete** | Detail → confirm dialog (+ Undo) | Favorites (+ Undo) | Diary → confirm dialog |
 
 ### Project structure
 
 ```
 app/src/main/java/com/example/stylebook/
-├── MainActivity.kt                      # Entry point, sets Compose content
+├── MainActivity.kt / StyleBookApplication.kt
 ├── data/
-│   ├── AppContainer.kt                  # Provides the shared repository (manual DI)
-│   ├── WardrobeRepository.kt            # In-memory StateFlows: items + saved outfits
-│   ├── SampleClothingData.kt            # 13 sample pieces
-│   └── model/                           # ClothingItem, Outfit, Category(+OutfitSlot), ClothingColor, Occasion
-├── domain/
-│   ├── OutfitGenerator.kt               # Outfit rules: slots, occasion, color harmony, locks, no-repeat
-│   └── ClothingItemValidator.kt         # AddItemForm + validation rules
+│   ├── AppContainer.kt                  # Manual DI: database → repository
+│   ├── WardrobeRepository.kt            # Repository interface + DeletedItem snapshot
+│   ├── OfflineWardrobeRepository.kt     # Room implementation
+│   ├── SampleClothingData.kt            # 13 sample pieces (seed)
+│   ├── local/                           # Entities, DAOs, Converters, Mappers, StyleBookDatabase
+│   └── model/                           # ClothingItem, Outfit, WearEntry, Category, ClothingColor, Occasion, GarmentArt
+├── domain/                              # OutfitGenerator, ClothingItemValidator, WearStats
 └── ui/
     ├── StyleBookApp.kt                  # Scaffold, NavHost, bottom bar, FAB, snackbars
-    ├── navigation/StyleBookDestinations.kt  # Routes + top-level tabs
-    ├── viewmodel/                       # WardrobeViewModel, OutfitViewModel, UserMessage
-    ├── screens/                         # Home, Wardrobe, AddItem, ItemDetail, OutfitGenerator, Favorites
-    ├── components/                      # Reusable composables (GarmentImage, ClothingItemRow/Tile, OutfitBoard, …)
-    └── theme/                           # Material 3 colors, typography, theme (light + dark)
-app/src/test/java/com/example/stylebook/ # 18 unit tests
+    ├── navigation/                      # Routes + top-level tabs
+    ├── viewmodel/                       # Wardrobe/Outfit/Diary ViewModels, AppViewModelProvider, UserMessage
+    ├── screens/                         # Home, Wardrobe, ItemForm, ItemDetail, OutfitGenerator, Favorites, Diary
+    ├── components/                      # Reusable composables
+    └── theme/
 ```
 
-## How the midterm requirements are met
+## How the HW3 requirements are met
 
 | Requirement | Implementation |
 |---|---|
-| ≥ 3 screens + Navigation Compose | 6 destinations in one `NavHost` (`ui/StyleBookApp.kt`): `home`, `wardrobe`, `generator`, `favorites`, `add_item`, `item/{itemId}` (typed `Int` argument). |
-| ≥ 3 meaningful features | Wardrobe search/filter, Add with validation, Outfit Generator, Favorites, Item detail with undo (see [Features](#features)). |
-| Material 3 + reusable composables | `MaterialTheme` with custom light/dark schemes, plus Material 3 components (`NavigationBar`, `Scaffold`, `SnackbarHost`, `PrimaryTabRow`, `Switch`, `FilterChip`, `OutlinedTextField`, `Card`/`OutlinedCard`, `FloatingActionButton`, `LazyColumn`/`LazyRow`). Reusable pieces live in `ui/components/`. |
-| `remember` | Home greeting and per-category counts (`remember(items)`), `SnackbarHostState`, `NavController`. |
-| `rememberSaveable` | Add form fields + `submitted` flag; Favorites selected tab. |
-| State hoisting | Every screen is stateless: it receives `state` + `onXxx` lambdas. Components like `ClothingItemRow`, `FavoriteButton`, `OutfitBoard` and `ColorChoice` are fully hoisted. |
-| ViewModel + StateFlow + `collectAsStateWithLifecycle()` | `WardrobeViewModel` / `OutfitViewModel` expose `StateFlow<UiState>` built with `combine(...).stateIn(...)`, collected in `StyleBookApp`. |
-| Coroutines | `viewModelScope`, `Channel` for one-off snackbar messages, `merge` + `LaunchedEffect` collection, and a `repository.items.collect { }` that rebuilds the current look if one of its pieces is deleted. |
-| Separation of UI / logic / state | See [Architecture](#architecture). |
-| Configuration changes | ViewModels survive rotation. `rememberSaveable` restores form input and the tab. Navigation back stack is restored by `NavHost`. Verified on an emulator by rotating with a half-filled form and an active filter. |
+| `LazyColumn`/`LazyGrid` with stable keys | Wardrobe `items(visibleItems, key = { it.id })`, Favorites `"outfit-$id"`/`"item-$id"`, Diary `"day-$epochDay"`/`"wear-$id"`, carousels keyed by id. |
+| List + detail with Navigation Compose | `wardrobe` → `item/{itemId}` → `item/{itemId}/edit` (typed `Int` arguments), plus `add_item`, `diary` and the other tabs. |
+| Create/edit forms with validation | `ItemFormScreen` + `ClothingItemValidator` (required fields, length, duplicate per category, self excluded on edit). |
+| Delete with confirmation dialog | `ConfirmDialog` before deleting a piece (Detail) and a diary entry (Diary). |
+| Additional feature | **Wear Diary** (see above). |
+| ViewModel + StateFlow, `collectAsStateWithLifecycle()` | Three ViewModels expose `StateFlow<UiState>` built with `combine(...).stateIn(...)`, collected in `StyleBookApp`. |
+| Separation UI / ViewModel / Repository / data source | `ui/screens` + `ui/components` → `ui/viewmodel` → `data/WardrobeRepository` → `data/local` (Room). |
+| State hoisting, reusable composables | Stateless screens; `ConfirmDialog`, `OutfitPiecesStrip`, `WearTodayButton`, `ClothingItemRow`, `GarmentImage`, `EditorialChip`, … |
+| Actions via ViewModel methods | e.g. `saveItem`, `deleteItem`, `wearCurrentOutfit`, `deleteEntry`. Composables only call lambdas. |
+| Room: Entity + DAO | 3 entities, 3 DAOs, `TypeConverters`, foreign keys, indices, seed callback. |
+| Full CRUD | See [CRUD → UI mapping](#crud--ui-mapping). |
+| Repository over the database | `OfflineWardrobeRepository` (transactions for delete/restore, duplicate checks). |
+| Room `Flow` → automatic UI updates | DAO `observeAll(): Flow<…>` → repository `map`/`combine` → ViewModel `stateIn`. |
+| Data persists after restart | Everything is in `stylebook.db`. Sample data is inserted only when the database is first created. |
+| Consistency across screens / navigation / rotation | One shared repository; Activity-scoped ViewModels; `rememberSaveable` for forms and dialogs. |
 
 ## Running the app
 
@@ -125,36 +175,29 @@ Gradle needs JDK 17+. The JDK bundled with Android Studio works:
 # macOS example; adjust the path for your system
 export JAVA_HOME="/Applications/Android Studio.app/Contents/jbr/Contents/Home"
 
-./gradlew :app:assembleDebug        # build -> app/build/outputs/apk/debug/app-debug.apk
-./gradlew :app:testDebugUnitTest    # run the unit tests
-./gradlew :app:installDebug         # install on a running emulator/device
+./gradlew :app:assembleDebug              # build -> app/build/outputs/apk/debug/app-debug.apk
+./gradlew :app:testDebugUnitTest          # JVM unit tests
+./gradlew :app:connectedDebugAndroidTest  # Room tests (needs a running emulator/device)
+./gradlew :app:installDebug               # install on a running emulator/device
 ```
 
 ## Tests
 
-18 JVM unit tests in `app/src/test/`:
+**JVM unit tests (28)** in `app/src/test/`, using `FakeWardrobeRepository` (in memory, same rules as the Room implementation):
 
-- `OutfitGeneratorTest`: one piece per required slot, occasion filter + at most one accent color, layer toggle, locked piece kept while shuffle changes the rest, and missing categories reported.
-- `WardrobeViewModelTest`: required-field validation, duplicate names, adding (trimmed, first in list, snackbar message), search, combined category/favorite filters, favorite toggle, and delete + undo at the same position.
-- `OutfitViewModelTest`: first look generated immediately, saving with duplicate detection, lock survives shuffle, *Style this piece*, occasion change, and deleting a piece (its saved looks are removed and the current look is rebuilt).
+- `OutfitGeneratorTest`: slots, occasion + color harmony, layer toggle, locks, missing categories.
+- `WardrobeViewModelTest`: loading state, validation, create, **edit** (self not a duplicate, cannot take another piece's name), search, filters, **sort by wear**, favorite toggle, **delete removes related looks/diary and Undo restores everything**.
+- `OutfitViewModelTest`: first look after load, save + duplicates, locks, *Style this piece*, delete rebuilds the look, **wear today once per day**, **saved look marked as worn**.
+- `DiaryViewModelTest`: grouping by day, most-worn and forgotten pieces, delete entry, wear again.
 
-`MainDispatcherRule` swaps `Dispatchers.Main` for a test dispatcher so `viewModelScope` can run on the JVM.
+**Instrumented tests** in `app/src/androidTest/`. `OfflineWardrobeRepositoryTest` runs on an in-memory Room database and covers CRUD, ordering, duplicate rejection, cascade on delete with restore, and deleting a diary entry.
 
 ## Limitations
 
-- **No persistent storage.** The wardrobe and saved looks are kept in memory in `WardrobeRepository`. They survive configuration changes but reset to the sample data when the app process is killed or restarted.
 - Garment images are tinted vector illustrations chosen by category. Taking photos is not implemented.
 - The outfit generator is rule-based (slots, occasion, color harmony), not machine learning.
-
-## Future extensions
-
-The design leaves room for these without rewriting the app:
-
-- **Persistence:** replace the `MutableStateFlow`s in `WardrobeRepository` with Room/DataStore. ViewModels and UI stay unchanged because they only depend on the repository's flows.
-- **StyleProfile:** add a model (preferred colors, fit, style), and pass it to `OutfitGenerator` as one more parameter to weight the candidates.
-- **Weather recommendations:** add a `WeatherProvider` in `domain/`. The generator already has an `includeLayer` switch and occasion filter that weather could drive.
-- **Simulated virtual try-on:** `OutfitBoard` already stacks pieces by slot, so a layered "mannequin" composable could reuse `Outfit.pieces`.
+- The database schema is version 1 with `exportSchema = false`. A future schema change needs a `Migration`.
 
 ## Defense material
 
-The demo script and defense notes (navigation, ViewModel, StateFlow, `remember` vs `rememberSaveable`, state hoisting, configuration changes) are in **[docs/DEFENSE.md](docs/DEFENSE.md)**.
+The demo script and defense notes are in **[docs/DEFENSE.md](docs/DEFENSE.md)**.

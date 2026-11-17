@@ -1,11 +1,12 @@
 package com.example.stylebook
 
-import com.example.stylebook.data.WardrobeRepository
 import com.example.stylebook.data.model.Occasion
 import com.example.stylebook.data.model.OutfitSlot
 import com.example.stylebook.domain.OutfitGenerator
 import com.example.stylebook.ui.viewmodel.OutfitViewModel
+import java.time.LocalDate
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.runTest
@@ -22,8 +23,9 @@ class OutfitViewModelTest {
     @get:Rule
     val mainDispatcherRule = MainDispatcherRule()
 
-    private val repository = WardrobeRepository()
-    private val viewModel by lazy { OutfitViewModel(repository, OutfitGenerator(Random(7))) }
+    private val today = LocalDate.of(2026, 11, 15)
+    private val repository = FakeWardrobeRepository()
+    private val viewModel by lazy { OutfitViewModel(repository, OutfitGenerator(Random(7)), today = { today }) }
 
     private fun runWithCollector(block: suspend () -> Unit) = runTest {
         backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { viewModel.uiState.collect {} }
@@ -31,7 +33,7 @@ class OutfitViewModelTest {
     }
 
     @Test
-    fun firstLookIsGeneratedImmediately() = runWithCollector {
+    fun firstLookIsGeneratedOnceTheWardrobeLoads() = runWithCollector {
         assertNotNull(viewModel.uiState.value.outfit)
     }
 
@@ -57,7 +59,7 @@ class OutfitViewModelTest {
 
     @Test
     fun styleAroundLocksTheChosenPiece() = runWithCollector {
-        val loafers = repository.items.value.first { it.id == 5 }
+        val loafers = repository.currentItems.first { it.id == 5 }
 
         viewModel.styleAround(loafers)
 
@@ -85,5 +87,28 @@ class OutfitViewModelTest {
         val outfit = viewModel.uiState.value.outfit!!
         assertTrue(outfit.pieces.all { Occasion.WORK in it.occasions })
         assertFalse(viewModel.uiState.value.isCurrentSaved)
+    }
+
+    @Test
+    fun wearingTheCurrentLookLogsItOncePerDay() = runWithCollector {
+        viewModel.wearCurrentOutfit()
+        assertEquals("Logged in today's diary", viewModel.messages.first().text)
+        viewModel.wearCurrentOutfit()
+        assertEquals("This look is already in today's diary", viewModel.messages.first().text)
+
+        val log = repository.wearLog.first()
+        assertEquals(1, log.size)
+        assertEquals(today, log.single().date)
+        assertTrue(viewModel.uiState.value.isCurrentWornToday)
+    }
+
+    @Test
+    fun wearingASavedLookMarksItAsWornToday() = runWithCollector {
+        viewModel.saveCurrentOutfit()
+        val saved = viewModel.uiState.value.savedOutfits.single()
+
+        viewModel.wearSavedOutfit(saved.id)
+
+        assertEquals(setOf(saved.id), viewModel.uiState.value.savedWornToday)
     }
 }

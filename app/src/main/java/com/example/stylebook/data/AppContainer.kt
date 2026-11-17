@@ -1,9 +1,14 @@
 package com.example.stylebook.data
 
+import android.content.Context
+import com.example.stylebook.data.local.StyleBookDatabase
+
 /**
- * Minimal manual dependency container. Both ViewModels receive the same repository,
- * so a change made on one screen (e.g. deleting a piece) is instantly visible on every other screen.
+ * Minimal manual dependency container, created once by [com.example.stylebook.StyleBookApplication].
+ * Every ViewModel receives the same repository, so a change made on one screen is visible on all others.
  */
-object AppContainer {
-    val wardrobeRepository: WardrobeRepository by lazy { WardrobeRepository() }
+class AppContainer(context: Context) {
+    val wardrobeRepository: WardrobeRepository by lazy {
+        OfflineWardrobeRepository(StyleBookDatabase.getInstance(context))
+    }
 }

@@ -26,6 +26,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.RectangleShape
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.navigation.NavBackStackEntry
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.NavHostController
 import androidx.navigation.NavType
@@ -34,16 +35,22 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
+import com.example.stylebook.data.model.ClothingItem
 import com.example.stylebook.ui.navigation.Routes
 import com.example.stylebook.ui.navigation.TopLevelDestination
-import com.example.stylebook.ui.screens.AddItemScreen
+import com.example.stylebook.ui.screens.DiaryScreen
 import com.example.stylebook.ui.screens.FavoritesScreen
 import com.example.stylebook.ui.screens.HomeScreen
 import com.example.stylebook.ui.screens.ItemDetailScreen
+import com.example.stylebook.ui.screens.ItemFormScreen
 import com.example.stylebook.ui.screens.OutfitGeneratorScreen
 import com.example.stylebook.ui.screens.WardrobeScreen
+import com.example.stylebook.ui.viewmodel.AppViewModelProvider
+import com.example.stylebook.ui.viewmodel.DiaryViewModel
 import com.example.stylebook.ui.viewmodel.OutfitViewModel
+import com.example.stylebook.ui.viewmodel.WardrobeUiState
 import com.example.stylebook.ui.viewmodel.WardrobeViewModel
+import java.time.LocalDate
 import kotlinx.coroutines.flow.merge
 
 /**
@@ -52,22 +59,24 @@ import kotlinx.coroutines.flow.merge
  */
 @Composable
 fun StyleBookApp(
-    wardrobeViewModel: WardrobeViewModel = viewModel(),
-    outfitViewModel: OutfitViewModel = viewModel()
+    wardrobeViewModel: WardrobeViewModel = viewModel(factory = AppViewModelProvider.Factory),
+    outfitViewModel: OutfitViewModel = viewModel(factory = AppViewModelProvider.Factory),
+    diaryViewModel: DiaryViewModel = viewModel(factory = AppViewModelProvider.Factory)
 ) {
     val navController = rememberNavController()
     val snackbarHostState = remember { SnackbarHostState() }
 
     val wardrobeState by wardrobeViewModel.uiState.collectAsStateWithLifecycle()
     val outfitState by outfitViewModel.uiState.collectAsStateWithLifecycle()
+    val diaryState by diaryViewModel.uiState.collectAsStateWithLifecycle()
 
     val backStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = backStackEntry?.destination?.route
     val currentTopLevel = TopLevelDestination.entries.firstOrNull { it.route == currentRoute }
 
-    // One-off messages (e.g. "Removed X — Undo") from both ViewModels are shown as Snackbars.
-    LaunchedEffect(wardrobeViewModel, outfitViewModel) {
-        merge(wardrobeViewModel.messages, outfitViewModel.messages).collect { message ->
+    // One-off messages (e.g. "Removed X — Undo") from all ViewModels are shown as Snackbars.
+    LaunchedEffect(wardrobeViewModel, outfitViewModel, diaryViewModel) {
+        merge(wardrobeViewModel.messages, outfitViewModel.messages, diaryViewModel.messages).collect { message ->
             val result = snackbarHostState.showSnackbar(
                 message = message.text,
                 actionLabel = message.actionLabel,
@@ -145,6 +154,7 @@ fun StyleBookApp(
                     onQueryChange = wardrobeViewModel::onQueryChange,
                     onCategorySelected = wardrobeViewModel::onCategorySelected,
                     onFavoritesOnlyChange = wardrobeViewModel::onFavoritesOnlyChange,
+                    onSortSelected = wardrobeViewModel::onSortSelected,
                     onClearFilters = wardrobeViewModel::clearFilters,
                     onItemClick = { navController.navigate(Routes.itemDetail(it.id)) },
                     onFavoriteClick = wardrobeViewModel::toggleFavorite,
@@ -159,6 +169,7 @@ fun StyleBookApp(
                     onToggleLock = outfitViewModel::toggleLock,
                     onShuffle = outfitViewModel::generate,
                     onSave = outfitViewModel::saveCurrentOutfit,
+                    onWearToday = outfitViewModel::wearCurrentOutfit,
                     onPieceClick = { navController.navigate(Routes.itemDetail(it.id)) },
                     onAddItem = { navController.navigate(Routes.ADD_ITEM) }
                 )
@@ -167,8 +178,10 @@ fun StyleBookApp(
                 FavoritesScreen(
                     favoriteItems = wardrobeState.favoriteItems,
                     savedOutfits = outfitState.savedOutfits,
+                    savedWornToday = outfitState.savedWornToday,
                     onItemClick = { navController.navigate(Routes.itemDetail(it.id)) },
                     onFavoriteClick = wardrobeViewModel::toggleFavorite,
+                    onWearOutfit = outfitViewModel::wearSavedOutfit,
                     onRemoveOutfit = outfitViewModel::removeOutfit,
                     onOpenGenerator = { navController.navigateToTopLevel(Routes.GENERATOR) },
                     onOpenWardrobe = {
@@ -177,36 +190,57 @@ fun StyleBookApp(
                     }
                 )
             }
+            composable(Routes.DIARY) {
+                DiaryScreen(
+                    state = diaryState,
+                    onItemClick = { navController.navigate(Routes.itemDetail(it.id)) },
+                    onWearAgain = diaryViewModel::wearAgainToday,
+                    onDeleteEntry = diaryViewModel::deleteEntry,
+                    onOpenGenerator = { navController.navigateToTopLevel(Routes.GENERATOR) }
+                )
+            }
             composable(Routes.ADD_ITEM) {
-                AddItemScreen(
-                    onValidate = wardrobeViewModel::validate,
-                    onSave = wardrobeViewModel::addItem,
+                ItemFormScreen(
+                    initial = null,
+                    onValidate = { wardrobeViewModel.validate(it) },
+                    onSave = { wardrobeViewModel.saveItem(it) },
                     onSaved = { navController.popBackStack() },
                     onBack = { navController.popBackStack() }
                 )
+            }
+            composable(
+                route = Routes.EDIT_ITEM,
+                arguments = listOf(navArgument(Routes.ITEM_ID_ARG) { type = NavType.IntType })
+            ) { entry ->
+                val itemId = entry.arguments?.getInt(Routes.ITEM_ID_ARG) ?: -1
+                ItemOrLeave(wardrobeState, itemId, navController, entry) { item ->
+                    ItemFormScreen(
+                        initial = item,
+                        onValidate = { wardrobeViewModel.validate(it, editingId = item.id) },
+                        onSave = { wardrobeViewModel.saveItem(it, editingId = item.id) },
+                        onSaved = { navController.popBackStack() },
+                        onBack = { navController.popBackStack() }
+                    )
+                }
             }
             composable(
                 route = Routes.ITEM_DETAIL,
                 arguments = listOf(navArgument(Routes.ITEM_ID_ARG) { type = NavType.IntType })
             ) { entry ->
                 val itemId = entry.arguments?.getInt(Routes.ITEM_ID_ARG) ?: -1
-                val item = wardrobeState.itemById(itemId)
-                if (item == null) {
-                    // The id is invalid or the piece was deleted elsewhere: leave the screen,
-                    // but only if this entry is still on top (it may already be animating out).
-                    LaunchedEffect(itemId) {
-                        if (navController.currentBackStackEntry?.id == entry.id) navController.popBackStack()
-                    }
-                } else {
+                ItemOrLeave(wardrobeState, itemId, navController, entry) { item ->
                     ItemDetailScreen(
                         item = item,
                         savedLooksWithItem = outfitState.savedOutfits.count { it.contains(item.id) },
+                        wearStats = wardrobeState.wearStatsFor(item.id),
+                        today = LocalDate.now(),
                         onBack = { navController.popBackStack() },
                         onFavoriteClick = { wardrobeViewModel.toggleFavorite(item.id) },
                         onStyleItem = {
                             outfitViewModel.styleAround(item)
                             navController.navigateToTopLevel(Routes.GENERATOR)
                         },
+                        onEdit = { navController.navigate(Routes.editItem(item.id)) },
                         onDelete = {
                             navController.popBackStack()
                             wardrobeViewModel.deleteItem(item.id)
@@ -214,6 +248,30 @@ fun StyleBookApp(
                     )
                 }
             }
+        }
+    }
+}
+
+/**
+ * Shows [content] for the piece with [itemId]. If the id is invalid or the piece was deleted elsewhere,
+ * the screen leaves itself, but only once the database has loaded and only if this entry is still on top
+ * (it may already be animating out).
+ */
+@Composable
+private fun ItemOrLeave(
+    state: WardrobeUiState,
+    itemId: Int,
+    navController: NavHostController,
+    entry: NavBackStackEntry,
+    content: @Composable (ClothingItem) -> Unit
+) {
+    if (state.isLoading) return
+    val item = state.itemById(itemId)
+    if (item != null) {
+        content(item)
+    } else {
+        LaunchedEffect(itemId) {
+            if (navController.currentBackStackEntry?.id == entry.id) navController.popBackStack()
         }
     }
 }

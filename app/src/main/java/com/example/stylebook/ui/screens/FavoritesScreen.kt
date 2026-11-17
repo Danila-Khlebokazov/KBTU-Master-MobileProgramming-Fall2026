@@ -33,8 +33,10 @@ import com.example.stylebook.ui.components.ScreenMasthead
 fun FavoritesScreen(
     favoriteItems: List<ClothingItem>,
     savedOutfits: List<Outfit>,
+    savedWornToday: Set<Int>,
     onItemClick: (ClothingItem) -> Unit,
     onFavoriteClick: (Int) -> Unit,
+    onWearOutfit: (Int) -> Unit,
     onRemoveOutfit: (Int) -> Unit,
     onOpenGenerator: () -> Unit,
     onOpenWardrobe: () -> Unit
@@ -90,7 +92,9 @@ fun FavoritesScreen(
             items(savedOutfits, key = { "outfit-${it.id}" }) { outfit ->
                 SavedOutfitCard(
                     outfit = outfit,
+                    wornToday = outfit.id in savedWornToday,
                     onPieceClick = onItemClick,
+                    onWearToday = { onWearOutfit(outfit.id) },
                     onRemove = { onRemoveOutfit(outfit.id) },
                     modifier = Modifier.padding(start = 24.dp, end = 24.dp, top = 16.dp)
                 )

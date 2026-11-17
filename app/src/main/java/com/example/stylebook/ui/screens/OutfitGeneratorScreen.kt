@@ -37,6 +37,7 @@ import com.example.stylebook.ui.components.PrimaryActionButton
 import com.example.stylebook.ui.components.ScreenMasthead
 import com.example.stylebook.ui.components.SecondaryActionButton
 import com.example.stylebook.ui.components.SectionLabel
+import com.example.stylebook.ui.components.WearTodayButton
 import com.example.stylebook.ui.viewmodel.OutfitUiState
 
 @OptIn(ExperimentalLayoutApi::class)
@@ -48,6 +49,7 @@ fun OutfitGeneratorScreen(
     onToggleLock: (OutfitSlot) -> Unit,
     onShuffle: () -> Unit,
     onSave: () -> Unit,
+    onWearToday: () -> Unit,
     onPieceClick: (ClothingItem) -> Unit,
     onAddItem: () -> Unit
 ) {
@@ -101,7 +103,9 @@ fun OutfitGeneratorScreen(
             HorizontalDivider(thickness = 2.dp, color = MaterialTheme.colorScheme.primary)
 
             val outfit = state.outfit
-            if (outfit == null) {
+            if (state.isLoading) {
+                Spacer(modifier = Modifier.height(32.dp))
+            } else if (outfit == null) {
                 EmptyState(
                     eyebrow = "MISSING PIECES",
                     title = "Can't build a look yet.",
@@ -154,6 +158,13 @@ fun OutfitGeneratorScreen(
                         modifier = Modifier.weight(1f)
                     )
                 }
+                WearTodayButton(
+                    wornToday = state.isCurrentWornToday,
+                    onClick = onWearToday,
+                    modifier = Modifier
+                        .align(Alignment.CenterHorizontally)
+                        .padding(top = 6.dp)
+                )
             }
             Spacer(modifier = Modifier.height(32.dp))
         }

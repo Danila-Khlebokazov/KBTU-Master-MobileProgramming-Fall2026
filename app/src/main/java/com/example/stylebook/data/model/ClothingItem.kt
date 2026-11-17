@@ -8,6 +8,11 @@ data class ClothingItem(
     val category: Category,
     val color: ClothingColor,
     val occasions: Set<Occasion>,
-    @param:DrawableRes val imageRes: Int,
-    val isFavorite: Boolean = false
-)
+    val art: GarmentArt = category.defaultArt,
+    val isFavorite: Boolean = false,
+    /** Epoch millis; the wardrobe is listed newest first. */
+    val addedAt: Long = 0
+) {
+    @get:DrawableRes
+    val imageRes: Int get() = art.res
+}
